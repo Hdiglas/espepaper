@@ -58,6 +58,9 @@ void setup() {
   // E-Ink Display initialisieren
   initDisplay();
   
+  // Settings laden
+  loadSettings();
+  
   // Ersten Text abrufen und anzeigen
   Serial.println("\n=== ERSTE AKTUALISIERUNG ===");
   updateDisplay();
@@ -227,6 +230,46 @@ void displayFullscreenText(String text) {
   EPD_7IN5_V2_Sleep();
   
   Serial.println(">>> Vollbild-Text erfolgreich angezeigt!");
+}
+
+void loadSettings() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WARNUNG] WLAN nicht verbunden, verwende Standard-Settings");
+    return;
+  }
+  
+  HTTPClient http;
+  http.setTimeout(5000);
+  http.begin(settingsUrl);
+  
+  int httpCode = http.GET();
+  
+  if (httpCode == 200) {
+    String payload = http.getString();
+    
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (!error && doc["success"] == true) {
+      if (doc["settings"]["fullscreen_interval"]) {
+        fullscreenInterval = doc["settings"]["fullscreen_interval"].as<unsigned long>() * 1000;
+        Serial.print("[OK] Vollbild-Interval geladen: ");
+        Serial.print(fullscreenInterval / 1000);
+        Serial.println(" Sekunden");
+      }
+      
+      if (doc["settings"]["fullscreen_duration"]) {
+        fullscreenDuration = doc["settings"]["fullscreen_duration"].as<unsigned long>() * 1000;
+        Serial.print("[OK] Vollbild-Dauer geladen: ");
+        Serial.print(fullscreenDuration / 1000);
+        Serial.println(" Sekunden");
+      }
+    }
+  } else {
+    Serial.println("[WARNUNG] Konnte Settings nicht laden, verwende Standard-Werte");
+  }
+  
+  http.end();
 }
 
 void connectWiFi() {
