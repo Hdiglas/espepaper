@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  eink-backend:
+    build: .
+    container_name: eink-display-backend
+    ports:
+      - "3000:3000"  # Externer Port:Interner Port - Ändere hier deinen Port!
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - eink-network
+
+networks:
+  eink-network:
+    driver: bridge
+

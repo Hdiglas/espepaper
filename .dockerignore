@@ -1,0 +1,5 @@
+# Docker .gitignore Einträge
+node_modules/
+.env
+*.log
+
