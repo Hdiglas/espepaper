@@ -1,0 +1,14 @@
+# Node.js
+node_modules/
+*.log
+.env
+
+# Arduino
+*.elf
+*.bin
+*.hex
+
+# OS
+.DS_Store
+Thumbs.db
+
