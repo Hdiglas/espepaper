@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Ink Display Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h1 { color: #667eea; font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 1.1em; }
+        
+        .tabs {
+            background: white;
+            border-radius: 15px 15px 0 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            overflow: hidden;
+        }
+        .tab-button {
+            flex: 1;
+            padding: 20px;
+            background: #f5f5f5;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #666;
+        }
+        .tab-button:hover { background: #e0e0e0; }
+        .tab-button.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+        .tab-content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+        .tab-content.active { display: block; }
+        
+        .section { margin-bottom: 30px; }
+        h2 { color: #667eea; margin-bottom: 20px; }
+        .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="number"], textarea {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover { background: #5568d3; transform: translateY(-2px); }
+        .text-item {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+        }
+        .text-item.active { border-color: #4caf50; background: #f1f8f4; }
+        .text-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .text-status.active { background: #4caf50; color: white; }
+        .text-status.inactive { background: #e0e0e0; color: #666; }
+        .text-actions { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .btn-small { padding: 8px 16px; font-size: 14px; }
+        .btn-activate { background: #4caf50; }
+        .btn-deactivate { background: #ff9800; }
+        .btn-delete { background: #f44336; }
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .message.success { background: #d4edda; color: #155724; }
+        .message.error { background: #f8d7da; color: #721c24; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .calendar-day-header {
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            min-height: 100px;
+        }
+        .calendar-day:hover { border-color: #667eea; background: #f0f4ff; }
+        .calendar-day.today { background: #fff3cd; border-color: #ffc107; }
+        .calendar-day.has-text {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-color: #2196f3;
+            border-width: 3px;
+            font-weight: bold;
+        }
+        .day-number { font-weight: bold; margin-bottom: 5px; }
+        .day-text-count {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .day-has-priority {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            color: #ff9800;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📺 E-Ink Display Manager</h1>
+            <p class="subtitle">Verwalte deine Display-Texte mit Kalender</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('texts')">📝 Texte</button>
+            <button class="tab-button" onclick="switchTab('calendar')">📅 Kalender</button>
+            <button class="tab-button" onclick="switchTab('settings')">⚙️ Settings</button>
+        </div>
+
+        <!-- Tab 1: Texte -->
+        <div id="tab-texts" class="tab-content active">
+            <div class="section">
+                <h2>➕ Neuen Text hinzufügen</h2>
+                <div id="addMessage"></div>
+                <textarea id="newText" placeholder="Gib hier deinen Text ein..." rows="3"></textarea>
+                <button onclick="addText()">Text hinzufügen</button>
+            </div>
+            <div class="section">
+                <h2>📝 Deine Texte</h2>
+                <div class="info-box">
+                    <strong>ℹ️ Info:</strong> Du kannst maximal 7 Texte gleichzeitig anzeigen. Texte max. 200 Zeichen.
+                </div>
+                <div id="textsList">Lade Texte...</div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Kalender -->
+        <div id="tab-calendar" class="tab-content">
+            <div class="section">
+                <h2 id="calendarTitle">📅 Oktober 2025</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button onclick="changeMonth(-1)">← Vorheriger</button>
+                    <button onclick="goToToday()">Heute</button>
+                    <button onclick="changeMonth(1)">Nächster →</button>
+                </div>
+                <div class="info-box">
+                    <strong>📅 Kalender-Texte:</strong> Klicke auf einen Tag um einen Text hinzuzufügen.
+                </div>
+                <div class="calendar-grid" id="calendarGrid">Lade Kalender...</div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Settings -->
+        <div id="tab-settings" class="tab-content">
+            <div class="section">
+                <h2>⚙️ Timer-Einstellungen</h2>
+                <div class="info-box">
+                    <strong>ℹ️ Erklärung:</strong> Der ESP32 zeigt den Vollbild-Text alle X Sekunden für Y Sekunden an.
+                </div>
+                <div id="settingsMessage"></div>
+                <label>Interval (Sekunden zwischen Vollbild-Anzeigen):</label>
+                <input type="number" id="interval" value="300" min="60" step="60">
+                <label>Dauer (Sekunden Vollbild-Anzeige):</label>
+                <input type="number" id="duration" value="60" min="10" step="10">
+                <button onclick="saveSettings()">💾 Speichern</button>
+                <button onclick="loadSettings()">🔄 Laden</button>
+            </div>
+            <div class="section">
+                <h2>📺 Vollbild-Texte</h2>
+                <div id="addFSMessage"></div>
+                <input type="text" id="fullscreenText" placeholder="Vollbild-Text eingeben">
+                <button onclick="addFullscreenText()">➕ Hinzufügen</button>
+                <div id="fullscreenList" style="margin-top: 20px;">Lade Texte...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            if (tab === 'calendar') loadCalendar();
+        }
+
+        // Texte Tab
+        async function loadTexts() {
+            try {
+                const response = await fetch(`${API_URL}/api/texts`);
+                const data = await response.json();
+                if (data.success) {
+                    const regularTexts = data.texts.filter(t => !t.display_date);
+                    const activeCount = regularTexts.filter(t => t.active).length;
+                    const container = document.getElementById('textsList');
+                    
+                    if (regularTexts.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Noch keine Texte</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = regularTexts.map(text => {
+                        const date = new Date(text.created_at).toLocaleString('de-DE');
+                        return `
+                            <div class="text-item ${text.active ? 'active' : ''}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 1.1em; margin-bottom: 10px;">${escapeHtml(text.content)}</div>
+                                        <div style="font-size: 0.85em; color: #999;">Erstellt: ${date}</div>
+                                    </div>
+                                    <span class="text-status ${text.active ? 'active' : 'inactive'}">
+                                        ${text.active ? '✓ Aktiv' : 'Inaktiv'}
+                                    </span>
+                                </div>
+                                <div class="text-actions">
+                                    ${!text.active && activeCount < 7 ? `<button class="btn-small btn-activate" onclick="toggleText(${text.id}, true)">Aktivieren</button>` : ''}
+                                    ${text.active ? `<button class="btn-small btn-deactivate" onclick="toggleText(${text.id}, false)">Deaktivieren</button>` : ''}
+                                    <button class="btn-small btn-delete" onclick="deleteText(${text.id})">Löschen</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Fehler:', error);
+            }
+        }
+
+        async function addText() {
+            const content = document.getElementById('newText').value.trim();
+            const messageDiv = document.getElementById('addMessage');
+            if (!content) {
+                showMessage(messageDiv, 'Bitte gib einen Text ein', 'error');
+                return;
+            }
+            try {
+                await fetch(`${API_URL}/api/text`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                document.getElementById('newText').value = '';
+                showMessage(messageDiv, '✅ Text hinzugefügt!', 'success');
+                loadTexts();
+            } catch (error) {
+                showMessage(messageDiv, '❌ Fehler', 'error');
+            }
+        }
+
+        async function toggleText(id, activate) {
+            try {
+                await fetch(`${API_URL}/api/text/${id}/toggle`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: activate })
+                });
+                loadTexts();
+            } catch (error) {
+                alert('Fehler');
+            }
+        }
+
+        async function deleteText(id) {
+            if (!confirm('Wirklich löschen?')) return;
+            try {
+                await fetch(`${API_URL}/api/text/${id}`, { method: 'DELETE' });
+                loadTexts();
+            } catch (error) {
+                alert('Fehler');
+            }
+        }
+
+        // Kalender Tab
+        async function loadCalendar() {
+            const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+            document.getElementById('calendarTitle').textContent = `📅 ${monthNames[currentMonth]} ${currentYear}`;
+            
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/calendar/${currentYear}/${currentMonth + 1}`);
+                const data = await response.json();
+                const textsByDate = {};
+                
+                if (data.success) {
+                    data.texts.forEach(text => {
+                        const dateObj = new Date(text.display_date);
+                        const localDate = dateObj.toISOString().split('T')[0];
+                        if (!textsByDate[localDate]) textsByDate[localDate] = [];
+                        textsByDate[localDate].push(text);
+                    });
+                }
+                
+                const grid = document.getElementById('calendarGrid');
+                let html = '';
+                
+                ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].forEach(day => {
+                    html += `<div class="calendar-day-header">${day}</div>`;
+                });
+                
+                for (let i = 0; i < startDay; i++) {
+                    html += '<div class="calendar-day other-month"></div>';
+                }
+                
+                const today = new Date();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isToday = today.getDate() === day && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+                    const textsForDay = textsByDate[date] || [];
+                    const hasTexts = textsForDay.length > 0;
+                    const hasPriority = textsForDay.some(t => t.is_priority);
+                    
+                    html += `
+                        <div class="calendar-day ${isToday ? 'today' : ''} ${hasTexts ? 'has-text' : ''}" 
+                             onclick="alert('Tag: ${day}\\nTexte: ${textsForDay.length}')">
+                            <div class="day-number">${day}</div>
+                            ${hasPriority ? '<div class="day-has-priority">⭐</div>' : ''}
+                            ${hasTexts ? `<div class="day-text-count">${textsForDay.length}</div>` : ''}
+                        </div>
+                    `;
+                }
+                
+                grid.innerHTML = html;
+            } catch (error) {
+                console.error('Fehler:', error);
+            }
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            loadCalendar();
+        }
+
+        function goToToday() {
+            const today = new Date();
+            currentMonth = today.getMonth();
+            currentYear = today.getFullYear();
+            loadCalendar();
+        }
+
+        // Settings Tab
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_URL}/api/settings`);
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('interval').value = data.settings.fullscreen_interval || 300;
+                    document.getElementById('duration').value = data.settings.fullscreen_duration || 60;
+                }
+            } catch (error) {
+                console.error('Fehler:', error);
+            }
+        }
+
+        async function saveSettings() {
+            const interval = document.getElementById('interval').value;
+            const duration = document.getElementById('duration').value;
+            const messageDiv = document.getElementById('settingsMessage');
+            
+            try {
+                await fetch(`${API_URL}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fullscreen_interval: interval, fullscreen_duration: duration })
+                });
+                showMessage(messageDiv, '✅ Gespeichert!', 'success');
+            } catch (error) {
+                showMessage(messageDiv, '❌ Fehler', 'error');
+            }
+        }
+
+        async function loadFullscreenTexts() {
+            try {
+                const response = await fetch(`${API_URL}/api/fullscreen-texts`);
+                const data = await response.json();
+                if (data.success) {
+                    const container = document.getElementById('fullscreenList');
+                    if (data.texts.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Noch keine Vollbild-Texte</div>';
+                        return;
+                    }
+                    container.innerHTML = data.texts.map(text => `
+                        <div class="text-item ${text.active ? 'active' : ''}">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 1.2em; font-weight: bold;">${escapeHtml(text.content)}</div>
+                                <span class="text-status ${text.active ? 'active' : 'inactive'}">${text.active ? '✓ Aktiv' : 'Inaktiv'}</span>
+                            </div>
+                            <div class="text-actions">
+                                ${!text.active ? `<button class="btn-small btn-activate" onclick="toggleFullscreen(${text.id}, true)">Aktivieren</button>` : `<button class="btn-small btn-deactivate" onclick="toggleFullscreen(${text.id}, false)">Deaktivieren</button>`}
+                                <button class="btn-small btn-delete" onclick="deleteFullscreen(${text.id})">Löschen</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Fehler:', error);
+            }
+        }
+
+        async function addFullscreenText() {
+            const content = document.getElementById('fullscreenText').value.trim();
+            const messageDiv = document.getElementById('addFSMessage');
+            if (!content) {
+                showMessage(messageDiv, 'Bitte Text eingeben', 'error');
+                return;
+            }
+            try {
+                await fetch(`${API_URL}/api/fullscreen-text`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                document.getElementById('fullscreenText').value = '';
+                showMessage(messageDiv, '✅ Hinzugefügt!', 'success');
+                loadFullscreenTexts();
+            } catch (error) {
+                showMessage(messageDiv, '❌ Fehler', 'error');
+            }
+        }
+
+        async function toggleFullscreen(id, activate) {
+            try {
+                await fetch(`${API_URL}/api/fullscreen-text/${id}/toggle`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: activate })
+                });
+                loadFullscreenTexts();
+            } catch (error) {
+                alert('Fehler');
+            }
+        }
+
+        async function deleteFullscreen(id) {
+            if (!confirm('Wirklich löschen?')) return;
+            try {
+                await fetch(`${API_URL}/api/fullscreen-text/${id}`, { method: 'DELETE' });
+                loadFullscreenTexts();
+            } catch (error) {
+                alert('Fehler');
+            }
+        }
+
+        function showMessage(element, text, type) {
+            element.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => element.innerHTML = '', 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load on startup
+        loadTexts();
+        setInterval(loadTexts, 5000);
+        loadSettings();
+        loadFullscreenTexts();
+        setInterval(loadFullscreenTexts, 5000);
+    </script>
+</body>
+</html>
